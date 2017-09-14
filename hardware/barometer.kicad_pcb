@@ -2,11 +2,11 @@
 
   (general
     (links 53)
-    (no_connects 3)
-    (area 140.136879 90.431619 155.519121 115.813841)
+    (no_connects 2)
+    (area 139.469339 89.769159 284.745862 165.740743)
     (thickness 1.6002)
     (drawings 13)
-    (tracks 204)
+    (tracks 206)
     (zones 0)
     (modules 26)
     (nets 35)
@@ -6702,6 +6702,8 @@
     (effects (font (size 0.7 0.7) (thickness 0.15)))
   )
 
+  (segment (start 147 108.05) (end 147 107.3) (width 0.29972) (layer Vorderseite) (net 1))
+  (via (at 147 107.3) (size 0.55) (drill 0.25) (layers Vorderseite Rückseite) (net 1))
   (segment (start 145.219239 100.1) (end 145 100.1) (width 0.29972) (layer Vorderseite) (net 1))
   (segment (start 145 100.1) (end 144.3 100.8) (width 0.29972) (layer Vorderseite) (net 1) (tstamp 59BA8527))
   (segment (start 144.3 100.8) (end 144 100.8) (width 0.29972) (layer Vorderseite) (net 1) (tstamp 59BA8529))
