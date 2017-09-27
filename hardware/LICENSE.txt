@@ -3,7 +3,7 @@ This project is licensed under CERN OHL v.1.1 (full text see below)
 Contact address: team@tinkerforge.com
 
 Modifications:
-Copyright (c) 2011, Bastian Nordmeyer (bastian@tinkerforge.com)
+Copyright (c) 2017, Bastian Nordmeyer (bastian@tinkerforge.com)
 
 
 
