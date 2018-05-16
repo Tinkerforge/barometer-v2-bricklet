@@ -19,13 +19,12 @@
  * Boston, MA 02111-1307, USA.
  */
 
-#define CALLBACK_VALUE_TYPE CALLBACK_VALUE_TYPE_INT32
-
 #include "communication.h"
 
-#include "bricklib2/utility/communication_callback.h"
 #include "bricklib2/protocols/tfp/tfp.h"
 #include "bricklib2/utility/callback_value.h"
+#include "bricklib2/hal/system_timer/system_timer.h"
+#include "bricklib2/utility/communication_callback.h"
 
 #include "lps22hb.h"
 
@@ -48,35 +47,90 @@ BootloaderHandleMessageResponse handle_message(const void *message, void *respon
 		case FID_GET_MOVING_AVERAGE_CONFIGURATION: return get_moving_average_configuration(message, response);
 		case FID_SET_REFERENCE_AIR_PRESSURE: return set_reference_air_pressure(message);
 		case FID_GET_REFERENCE_AIR_PRESSURE: return get_reference_air_pressure(message, response);
+		case FID_SET_CALIBRATION: return set_calibration(message);
+		case FID_GET_CALIBRATION: return get_calibration(message, response);
 		default: return HANDLE_MESSAGE_RESPONSE_NOT_SUPPORTED;
 	}
 }
 
-
 BootloaderHandleMessageResponse set_moving_average_configuration(const SetMovingAverageConfiguration *data) {
+	if((data->moving_average_length_air_pressure > MOVING_AVERAGE_MAX_LENGTH) ||
+	   (data->moving_average_length_altitude > MOVING_AVERAGE_MAX_LENGTH) ||
+	   (data->moving_average_length_temperature > MOVING_AVERAGE_MAX_LENGTH) ||
+	   (data->moving_average_length_air_pressure < 1) ||
+	   (data->moving_average_length_altitude < 1) ||
+	   (data->moving_average_length_temperature < 1)) {
+			return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
+	}
+
+	moving_average_new_length(&lps22hb.moving_average_air_pressure, data->moving_average_length_air_pressure);
+	moving_average_new_length(&lps22hb.moving_average_altitude, data->moving_average_length_altitude);
+	moving_average_new_length(&lps22hb.moving_average_temperature, data->moving_average_length_temperature);
 
 	return HANDLE_MESSAGE_RESPONSE_EMPTY;
 }
 
 BootloaderHandleMessageResponse get_moving_average_configuration(const GetMovingAverageConfiguration *data, GetMovingAverageConfiguration_Response *response) {
 	response->header.length = sizeof(GetMovingAverageConfiguration_Response);
+	response->moving_average_length_air_pressure = lps22hb.moving_average_air_pressure.length;
+	response->moving_average_length_altitude = lps22hb.moving_average_altitude.length;
+	response->moving_average_length_temperature = lps22hb.moving_average_temperature.length;
 
 	return HANDLE_MESSAGE_RESPONSE_NEW_MESSAGE;
 }
 
 BootloaderHandleMessageResponse set_reference_air_pressure(const SetReferenceAirPressure *data) {
+	if((data->air_pressure < 1064960 || data->air_pressure > 5160960) && (data->air_pressure > 0)) {
+		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
+	}
+
+	if(data->air_pressure == 0) {
+		lps22hb.reference_air_pressure = lps22hb.air_pressure;
+	}
+	else {
+		lps22hb.reference_air_pressure = data->air_pressure;
+	}
 
 	return HANDLE_MESSAGE_RESPONSE_EMPTY;
 }
 
 BootloaderHandleMessageResponse get_reference_air_pressure(const GetReferenceAirPressure *data, GetReferenceAirPressure_Response *response) {
 	response->header.length = sizeof(GetReferenceAirPressure_Response);
+	response->air_pressure = lps22hb.reference_air_pressure;
 
 	return HANDLE_MESSAGE_RESPONSE_NEW_MESSAGE;
 }
 
+BootloaderHandleMessageResponse set_calibration(const SetCalibration *data) {
+	if((data->calibration < -32768) ||
+	   (data->calibration > 32767)) {
+			return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
+	}
 
+	// Save to RAM
+	lps22hb.calibration_offset = data->calibration;
 
+	// Save to flash
+	eeprom_write_calibration();
+
+	// Apply calibration
+	lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_RPDS_L);
+	lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.calibration_offset & 0x00FF); // LSB
+	lps22hb.spi_fifo_buf[2] = (uint8_t)((lps22hb.calibration_offset & 0xFF00) >> 8); // MSB
+
+	spi_fifo_transceive(&lps22hb.spi_fifo, 3, &lps22hb.spi_fifo_buf[0]);
+	system_timer_sleep_ms(4);
+	spi_fifo_next_state(&lps22hb.spi_fifo);
+
+	return HANDLE_MESSAGE_RESPONSE_EMPTY;
+}
+
+BootloaderHandleMessageResponse get_calibration(const GetCalibration *data, GetCalibration_Response *response) {
+	response->header.length = sizeof(GetCalibration_Response);
+	response->calibration = lps22hb.calibration_offset;
+
+	return HANDLE_MESSAGE_RESPONSE_NEW_MESSAGE;
+}
 
 bool handle_air_pressure_callback(void) {
 	return handle_callback_value_callback(&callback_value_air_pressure, FID_CALLBACK_AIR_PRESSURE);
@@ -95,10 +149,9 @@ void communication_tick(void) {
 }
 
 void communication_init(void) {
-	// TODO: Add proper functions
-	callback_value_init(&callback_value_air_pressure, lps22hb_get_air_pressure);
 	callback_value_init(&callback_value_altitude, lps22hb_get_altitude);
 	callback_value_init(&callback_value_temperature, lps22hb_get_temperature);
+	callback_value_init(&callback_value_air_pressure, lps22hb_get_air_pressure);
 
 	communication_callback_init();
 }

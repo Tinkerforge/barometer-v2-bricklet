@@ -25,8 +25,6 @@
 
 #include "xmc_gpio.h"
 
-// TODO: CHECK ALL DEFINES!!!
-
 // --- Basic defines ---
 #define BOOTLOADER_DEVICE_IDENTIFIER   2117
 #define BOOTLOADER_HW_VERSION_MAJOR    1

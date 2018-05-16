@@ -72,6 +72,8 @@ void communication_init(void);
 #define FID_GET_MOVING_AVERAGE_CONFIGURATION 14
 #define FID_SET_REFERENCE_AIR_PRESSURE 15
 #define FID_GET_REFERENCE_AIR_PRESSURE 16
+#define FID_SET_CALIBRATION 17
+#define FID_GET_CALIBRATION 18
 
 #define FID_CALLBACK_AIR_PRESSURE 4
 #define FID_CALLBACK_ALTITUDE 8
@@ -97,7 +99,7 @@ typedef struct {
 
 typedef struct {
 	TFPMessageHeader header;
-	int32_t air_pressure;
+	uint32_t air_pressure;
 } __attribute__((__packed__)) SetReferenceAirPressure;
 
 typedef struct {
@@ -106,15 +108,30 @@ typedef struct {
 
 typedef struct {
 	TFPMessageHeader header;
-	int32_t air_pressure;
+	uint32_t air_pressure;
 } __attribute__((__packed__)) GetReferenceAirPressure_Response;
 
+typedef struct {
+	TFPMessageHeader header;
+	int16_t calibration;
+} __attribute__((__packed__)) SetCalibration;
+
+typedef struct {
+	TFPMessageHeader header;
+} __attribute__((__packed__)) GetCalibration;
+
+typedef struct {
+	TFPMessageHeader header;
+	int16_t calibration;
+} __attribute__((__packed__)) GetCalibration_Response;
 
 // Function prototypes
 BootloaderHandleMessageResponse set_moving_average_configuration(const SetMovingAverageConfiguration *data);
 BootloaderHandleMessageResponse get_moving_average_configuration(const GetMovingAverageConfiguration *data, GetMovingAverageConfiguration_Response *response);
 BootloaderHandleMessageResponse set_reference_air_pressure(const SetReferenceAirPressure *data);
 BootloaderHandleMessageResponse get_reference_air_pressure(const GetReferenceAirPressure *data, GetReferenceAirPressure_Response *response);
+BootloaderHandleMessageResponse set_calibration(const SetCalibration *data);
+BootloaderHandleMessageResponse get_calibration(const GetCalibration *data, GetCalibration_Response *response);
 
 // Callbacks
 bool handle_air_pressure_callback(void);
@@ -127,6 +144,5 @@ bool handle_temperature_callback(void);
 	handle_air_pressure_callback, \
 	handle_altitude_callback, \
 	handle_temperature_callback, \
-
 
 #endif

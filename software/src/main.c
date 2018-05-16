@@ -29,14 +29,18 @@
 #include "bricklib2/logging/logging.h"
 #include "communication.h"
 
+#include "lps22hb.h"
+
 int main(void) {
 	logging_init();
 	logd("Start Barometer V2 Bricklet\n\r");
 
 	communication_init();
+	lps22hb_init();
 
 	while(true) {
 		bootloader_tick();
 		communication_tick();
+		lps22hb_tick();
 	}
 }

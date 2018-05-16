@@ -35,6 +35,7 @@ SET(SOURCES
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/hal/system_timer/system_timer.c"
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/hal/startup/startup_xmc1.c"
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/hal/startup/startup_xmc1100.S"
+	"${PROJECT_SOURCE_DIR}/src/bricklib2/hal/spi_fifo/spi_fifo.c"
 
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/bootloader/bootloader.c"
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/bootloader/bootloader_xmc_irq.c"
@@ -44,6 +45,7 @@ SET(SOURCES
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/utility/pearson_hash.c"
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/utility/communication_callback.c"
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/utility/callback_value.c"
+	"${PROJECT_SOURCE_DIR}/src/bricklib2/utility/moving_average.c"
 
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/xmclib/XMCLib/src/xmc_gpio.c"
 	"${PROJECT_SOURCE_DIR}/src/bricklib2/xmclib/XMCLib/src/xmc1_gpio.c"
