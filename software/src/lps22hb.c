@@ -195,7 +195,7 @@ void lps22hb_tick(void) {
 
 	if(fs == SPI_FIFO_STATE_TRANSCEIVE_READY) {
 		if(lps22hb.sm == SM_INIT) {
-			lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_STATUS);
+			lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
 			lps22hb.spi_fifo_buf[1] = 0x00;
 
 			XMC_USIC_CH_RXFIFO_Flush(lps22hb.spi_fifo.channel);
@@ -206,7 +206,7 @@ void lps22hb_tick(void) {
 		else if(lps22hb.sm == SM_CHECK_STATUS) {
 			spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 2);
 
-			if ((lps22hb.spi_fifo_buf[1] & LPS22HB_REG_STATUS_MSK_P_DA)) {
+			if (!(lps22hb.spi_fifo_buf[1] & LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT)) {
 				lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_PRESS_OUT_XL);
 				lps22hb.spi_fifo_buf[1] = 0x00;
 				lps22hb.spi_fifo_buf[2] = 0x00;
@@ -220,7 +220,7 @@ void lps22hb_tick(void) {
 				lps22hb.sm = SM_READ_SENSOR_DATA;
 			}
 			else {
-				lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_STATUS);
+				lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
 				lps22hb.spi_fifo_buf[1] = 0x00;
 
 				XMC_USIC_CH_RXFIFO_Flush(lps22hb.spi_fifo.channel);
