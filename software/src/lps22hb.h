@@ -28,7 +28,8 @@
 #define CALIBRATION_PAGE 1
 #define CALIBRATION_MAGIC 0x12345678
 #define CALIBRATION_MAGIC_POS 0
-#define CALIBRATION_OFFSET_POS 1
+#define CALIBRATION_MEASURED_AIR_PRESSURE_POS 1
+#define CALIBRATION_REFERENCE_AIR_PRESSURE_POS 2
 
 #define LPS22HB_REG_ADDR_INTERRUPT_CFG 0x0B
 #define LPS22HB_REG_ADDR_THS_P_L 0x0C
@@ -81,7 +82,7 @@
 #define GET_READ_ADDR(addr) ((addr) + 0x80)
 #define GET_WRITE_ADDR(addr) (addr)
 
-#define DEFAULT_REFERENCE_AIR_PRESSURE 4150272 // 1013.25 mbar * 4096
+#define DEFAULT_REFERENCE_AIR_PRESSURE 1013250 // (1013.25 * 1000) mbar
 
 typedef struct {
 	int64_t air_pressure;
@@ -102,7 +103,9 @@ typedef struct {
 	int32_t air_pressure;
 	uint8_t spi_fifo_buf[16];
 	int32_t reference_air_pressure;
-	int32_t calibration_offset;
+	int16_t cal_offset;
+	int32_t cal_measured_air_pressure;
+	int32_t cal_reference_air_pressure;
 	MovingAverage moving_average_altitude;
 	MovingAverage moving_average_temperature;
 	MovingAverage moving_average_air_pressure;
@@ -119,5 +122,6 @@ int32_t lps22hb_get_temperature(void);
 
 void eeprom_read_calibration(void);
 void eeprom_write_calibration(void);
-
+int16_t get_cal_offset(int32_t measured_air_pressure,
+                       int32_t reference_air_pressure);
 #endif

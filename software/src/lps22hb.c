@@ -29,15 +29,16 @@
 
 LPS22HB_t lps22hb;
 
+// Air pressure in mbar/1000
 const AltitudeFactor altitude_factors[] = {
-	[0] = {5017600, 14},
-	[1] = {4579328, 13},
-	[2] = {4145152, 12},
-	[3] = {3723264, 11},
-	[4] = {3309568, 10},
-	[5] = {2908160, 9},
-	[6] = {2514944, 8},
-	[7] = {2129920, 7}
+	[0] = {1225005, 14},
+	[1] = {1118311, 13},
+	[2] = {1012049, 12},
+	[3] = {909702, 11},
+	[4] = {808871, 10},
+	[5] = {710051, 9},
+	[6] = {614001, 8},
+	[7] = {520296, 7}
 };
 
 void eeprom_write_calibration(void) {
@@ -46,7 +47,8 @@ void eeprom_write_calibration(void) {
 	uint32_t page[EEPROM_PAGE_SIZE/sizeof(uint32_t)];
 
 	page[CALIBRATION_MAGIC_POS] = CALIBRATION_MAGIC;
-	page[CALIBRATION_OFFSET_POS] = lps22hb.calibration_offset;
+	page[CALIBRATION_MEASURED_AIR_PRESSURE_POS] = lps22hb.cal_measured_air_pressure;
+	page[CALIBRATION_REFERENCE_AIR_PRESSURE_POS] = lps22hb.cal_reference_air_pressure;
 
 	if(!bootloader_write_eeprom_page(CALIBRATION_PAGE, page)) {
 		// TODO: Error handling?
@@ -65,26 +67,48 @@ void eeprom_read_calibration(void) {
 	// This is either our first startup or something went wrong.
 	// We initialize the calibration data with sane default values.
 	if(page[0] != CALIBRATION_MAGIC) {
-		lps22hb.calibration_offset = 0;
+		lps22hb.cal_measured_air_pressure = 0;
+		lps22hb.cal_reference_air_pressure = 0;
+
 		eeprom_write_calibration();
 
 		return;
 	}
 
-	lps22hb.calibration_offset = page[CALIBRATION_OFFSET_POS];
+	lps22hb.cal_measured_air_pressure = page[CALIBRATION_MEASURED_AIR_PRESSURE_POS];
+	lps22hb.cal_reference_air_pressure = page[CALIBRATION_REFERENCE_AIR_PRESSURE_POS];
+}
+
+int16_t get_cal_offset(int32_t measured_air_pressure,
+                       int32_t reference_air_pressure) {
+	/*
+	 * Offset = 16 (16*256 = 4096) implies pressure difference of 1 mbar (4096 counts = 1 mbar)
+	 *
+	 * Offset = (((measured - reference) / 0.1) * 1.6) / 1000
+	 */
+	int64_t cal_offset_i64 = (measured_air_pressure - reference_air_pressure) * 10 * 16;
+
+	return (int16_t)(cal_offset_i64 / 10000);
 }
 
 void lps22hb_init(void) {
 	logd("[+] B2: lps22hb_init()\n\r");
 
 	lps22hb.altitude = 0;
+	lps22hb.cal_offset = 0;
 	lps22hb.temperature = 0;
 	lps22hb.air_pressure = 0;
-	lps22hb.calibration_offset = 0;
+	lps22hb.cal_measured_air_pressure = 0;
+	lps22hb.cal_reference_air_pressure = 0;
 	lps22hb.reference_air_pressure = (int32_t)DEFAULT_REFERENCE_AIR_PRESSURE;
 
-	// Load settings from flash
+	// Load calibration from flash
 	eeprom_read_calibration();
+
+	// Get the air pressure calibration offset value
+	lps22hb.cal_offset = \
+		get_cal_offset(lps22hb.cal_measured_air_pressure,
+		               lps22hb.cal_reference_air_pressure);
 
 	// Initialise SPI FIFO
 	lps22hb.spi_fifo.baudrate = LPS22HB_SPI_BAUDRATE;
@@ -138,8 +162,8 @@ void lps22hb_init(void) {
 
 	// Apply calibration
 	lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_RPDS_L);
-	lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.calibration_offset & 0x00FF); // LSB
-	lps22hb.spi_fifo_buf[2] = (uint8_t)(((lps22hb.calibration_offset & 0xFF00) >> 8)); // MSB
+	lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.cal_offset & 0x00FF); // LSB
+	lps22hb.spi_fifo_buf[2] = (uint8_t)(((lps22hb.cal_offset & 0xFF00) >> 8)); // MSB
 
 	spi_fifo_transceive(&lps22hb.spi_fifo, 3, &lps22hb.spi_fifo_buf[0]);
 	system_timer_sleep_ms(4);
@@ -214,6 +238,7 @@ void lps22hb_tick(void) {
 			int32_t total_delta = 0;
 			int32_t upper_delta = 0;
 			int32_t lower_delta = 0;
+			int64_t air_pressure_i64 = 0;
 
 			int32_t altitude = 0;
 			int32_t temperature = ((lps22hb.spi_fifo_buf[5] << 8) | lps22hb.spi_fifo_buf[4]);
@@ -234,6 +259,11 @@ void lps22hb_tick(void) {
 				temperature |= 0xFFFF0000;
 			}
 
+			air_pressure_i64 = air_pressure * 10;
+			air_pressure_i64 = air_pressure_i64 * 10;
+			air_pressure_i64 = air_pressure_i64 * 10;
+			air_pressure = (int32_t)(air_pressure_i64 >> 12); // Divided by 4096
+
 			// Calculate altitude from the current air pressure
 			while(upper > 0 && (air_pressure > altitude_factors[upper].air_pressure)) {
 				upper--;
@@ -247,15 +277,13 @@ void lps22hb_tick(void) {
 				total_delta = altitude_factors[upper].air_pressure - altitude_factors[lower].air_pressure;
 				upper_delta = altitude_factors[upper].air_pressure - air_pressure;
 				lower_delta = air_pressure - altitude_factors[lower].air_pressure;
+				factor = ((altitude_factors[upper].factor) * lower_delta +
+						  (altitude_factors[lower].factor) * upper_delta) / total_delta;
 
-				factor = ((altitude_factors[upper].factor * lower_delta) +
-						  (altitude_factors[lower].factor * upper_delta)) / total_delta;
-
-				altitude = (int32_t)(((int64_t)delta * (int64_t)factor) >> 2); // In mm
-			}
-			else {
+				altitude = (int32_t)(delta * factor);
+			} else {
 				lower = upper;
-				altitude = (int32_t)((delta * altitude_factors[upper].factor) >> 2); // In mm
+				altitude = (int32_t)(delta * altitude_factors[upper].factor);
 			}
 
 			if(first_value) {

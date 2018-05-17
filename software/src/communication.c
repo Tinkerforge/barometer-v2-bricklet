@@ -80,7 +80,7 @@ BootloaderHandleMessageResponse get_moving_average_configuration(const GetMoving
 }
 
 BootloaderHandleMessageResponse set_reference_air_pressure(const SetReferenceAirPressure *data) {
-	if((data->air_pressure < 1064960 || data->air_pressure > 5160960) && (data->air_pressure > 0)) {
+	if((data->air_pressure < 260000 || data->air_pressure > 1260000) && (data->air_pressure > 0)) {
 		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
@@ -102,21 +102,29 @@ BootloaderHandleMessageResponse get_reference_air_pressure(const GetReferenceAir
 }
 
 BootloaderHandleMessageResponse set_calibration(const SetCalibration *data) {
-	if((data->calibration < -32768) ||
-	   (data->calibration > 32767)) {
+	if(((data->measured_air_pressure < 260000) ||
+	    (data->measured_air_pressure > 1260000) ||
+	    (data->reference_air_pressure < 260000) ||
+	    (data->reference_air_pressure > 1260000)) &&
+	    (data->measured_air_pressure > 0 && data->reference_air_pressure > 0)) {
 			return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
 	// Save to RAM
-	lps22hb.calibration_offset = data->calibration;
+	lps22hb.cal_measured_air_pressure = data->measured_air_pressure;
+	lps22hb.cal_reference_air_pressure = data->reference_air_pressure;
+
+	// Calculate offset value
+	lps22hb.cal_offset = get_cal_offset(data->measured_air_pressure,
+		                                data->reference_air_pressure);
 
 	// Save to flash
 	eeprom_write_calibration();
 
 	// Apply calibration
 	lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_RPDS_L);
-	lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.calibration_offset & 0x00FF); // LSB
-	lps22hb.spi_fifo_buf[2] = (uint8_t)((lps22hb.calibration_offset & 0xFF00) >> 8); // MSB
+	lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.cal_offset & 0x00FF); // LSB
+	lps22hb.spi_fifo_buf[2] = (uint8_t)((lps22hb.cal_offset & 0xFF00) >> 8); // MSB
 
 	spi_fifo_transceive(&lps22hb.spi_fifo, 3, &lps22hb.spi_fifo_buf[0]);
 	system_timer_sleep_ms(4);
@@ -127,7 +135,8 @@ BootloaderHandleMessageResponse set_calibration(const SetCalibration *data) {
 
 BootloaderHandleMessageResponse get_calibration(const GetCalibration *data, GetCalibration_Response *response) {
 	response->header.length = sizeof(GetCalibration_Response);
-	response->calibration = lps22hb.calibration_offset;
+	response->measured_air_pressure = lps22hb.cal_measured_air_pressure;
+	response->reference_air_pressure = lps22hb.cal_reference_air_pressure;
 
 	return HANDLE_MESSAGE_RESPONSE_NEW_MESSAGE;
 }
