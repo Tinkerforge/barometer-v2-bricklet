@@ -28,21 +28,22 @@
 
 #include "lps22hb.h"
 
-CallbackValue callback_value_altitude;
-CallbackValue callback_value_temperature;
-CallbackValue callback_value_air_pressure;
+// FIXME: use a different data types, now that callback-value supports that?
+CallbackValue_int32_t callback_value_altitude;
+CallbackValue_int32_t callback_value_temperature;
+CallbackValue_int32_t callback_value_air_pressure;
 
 BootloaderHandleMessageResponse handle_message(const void *message, void *response) {
 	switch(tfp_get_fid_from_message(message)) {
-		case FID_GET_AIR_PRESSURE: return get_callback_value(message, response, &callback_value_air_pressure);
-		case FID_SET_AIR_PRESSURE_CALLBACK_CONFIGURATION: return set_callback_value_callback_configuration(message, &callback_value_air_pressure);
-		case FID_GET_AIR_PRESSURE_CALLBACK_CONFIGURATION: return get_callback_value_callback_configuration(message, response, &callback_value_air_pressure);
-		case FID_GET_ALTITUDE: return get_callback_value(message, response, &callback_value_altitude);
-		case FID_SET_ALTITUDE_CALLBACK_CONFIGURATION: return set_callback_value_callback_configuration(message, &callback_value_altitude);
-		case FID_GET_ALTITUDE_CALLBACK_CONFIGURATION: return get_callback_value_callback_configuration(message, response, &callback_value_altitude);
-		case FID_GET_TEMPERATURE: return get_callback_value(message, response, &callback_value_temperature);
-		case FID_SET_TEMPERATURE_CALLBACK_CONFIGURATION: return set_callback_value_callback_configuration(message, &callback_value_temperature);
-		case FID_GET_TEMPERATURE_CALLBACK_CONFIGURATION: return get_callback_value_callback_configuration(message, response, &callback_value_temperature);
+		case FID_GET_AIR_PRESSURE: return get_callback_value_int32_t(message, response, &callback_value_air_pressure);
+		case FID_SET_AIR_PRESSURE_CALLBACK_CONFIGURATION: return set_callback_value_callback_configuration_int32_t(message, &callback_value_air_pressure);
+		case FID_GET_AIR_PRESSURE_CALLBACK_CONFIGURATION: return get_callback_value_callback_configuration_int32_t(message, response, &callback_value_air_pressure);
+		case FID_GET_ALTITUDE: return get_callback_value_int32_t(message, response, &callback_value_altitude);
+		case FID_SET_ALTITUDE_CALLBACK_CONFIGURATION: return set_callback_value_callback_configuration_int32_t(message, &callback_value_altitude);
+		case FID_GET_ALTITUDE_CALLBACK_CONFIGURATION: return get_callback_value_callback_configuration_int32_t(message, response, &callback_value_altitude);
+		case FID_GET_TEMPERATURE: return get_callback_value_int32_t(message, response, &callback_value_temperature);
+		case FID_SET_TEMPERATURE_CALLBACK_CONFIGURATION: return set_callback_value_callback_configuration_int32_t(message, &callback_value_temperature);
+		case FID_GET_TEMPERATURE_CALLBACK_CONFIGURATION: return get_callback_value_callback_configuration_int32_t(message, response, &callback_value_temperature);
 		case FID_SET_MOVING_AVERAGE_CONFIGURATION: return set_moving_average_configuration(message);
 		case FID_GET_MOVING_AVERAGE_CONFIGURATION: return get_moving_average_configuration(message, response);
 		case FID_SET_REFERENCE_AIR_PRESSURE: return set_reference_air_pressure(message);
@@ -142,15 +143,15 @@ BootloaderHandleMessageResponse get_calibration(const GetCalibration *data, GetC
 }
 
 bool handle_air_pressure_callback(void) {
-	return handle_callback_value_callback(&callback_value_air_pressure, FID_CALLBACK_AIR_PRESSURE);
+	return handle_callback_value_callback_int32_t(&callback_value_air_pressure, FID_CALLBACK_AIR_PRESSURE);
 }
 
 bool handle_altitude_callback(void) {
-	return handle_callback_value_callback(&callback_value_altitude, FID_CALLBACK_ALTITUDE);
+	return handle_callback_value_callback_int32_t(&callback_value_altitude, FID_CALLBACK_ALTITUDE);
 }
 
 bool handle_temperature_callback(void) {
-	return handle_callback_value_callback(&callback_value_temperature, FID_CALLBACK_TEMPERATURE);
+	return handle_callback_value_callback_int32_t(&callback_value_temperature, FID_CALLBACK_TEMPERATURE);
 }
 
 void communication_tick(void) {
@@ -158,9 +159,9 @@ void communication_tick(void) {
 }
 
 void communication_init(void) {
-	callback_value_init(&callback_value_altitude, lps22hb_get_altitude);
-	callback_value_init(&callback_value_temperature, lps22hb_get_temperature);
-	callback_value_init(&callback_value_air_pressure, lps22hb_get_air_pressure);
+	callback_value_init_int32_t(&callback_value_altitude, lps22hb_get_altitude);
+	callback_value_init_int32_t(&callback_value_temperature, lps22hb_get_temperature);
+	callback_value_init_int32_t(&callback_value_air_pressure, lps22hb_get_air_pressure);
 
 	communication_callback_init();
 }
