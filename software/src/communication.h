@@ -114,7 +114,7 @@ typedef struct {
 typedef struct {
 	TFPMessageHeader header;
 	int32_t measured_air_pressure;
-	int32_t reference_air_pressure;
+	int32_t actual_air_pressure;
 } __attribute__((__packed__)) SetCalibration;
 
 typedef struct {
@@ -124,7 +124,7 @@ typedef struct {
 typedef struct {
 	TFPMessageHeader header;
 	int32_t measured_air_pressure;
-	int32_t reference_air_pressure;
+	int32_t actual_air_pressure;
 } __attribute__((__packed__)) GetCalibration_Response;
 
 // Function prototypes

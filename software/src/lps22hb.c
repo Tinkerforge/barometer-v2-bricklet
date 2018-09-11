@@ -48,7 +48,7 @@ void eeprom_write_calibration(void) {
 
 	page[CALIBRATION_MAGIC_POS] = CALIBRATION_MAGIC;
 	page[CALIBRATION_MEASURED_AIR_PRESSURE_POS] = lps22hb.cal_measured_air_pressure;
-	page[CALIBRATION_REFERENCE_AIR_PRESSURE_POS] = lps22hb.cal_reference_air_pressure;
+	page[CALIBRATION_ACTUAL_AIR_PRESSURE_POS] = lps22hb.cal_actual_air_pressure;
 
 	if(!bootloader_write_eeprom_page(CALIBRATION_PAGE, page)) {
 		// TODO: Error handling?
@@ -68,7 +68,7 @@ void eeprom_read_calibration(void) {
 	// We initialize the calibration data with sane default values.
 	if(page[0] != CALIBRATION_MAGIC) {
 		lps22hb.cal_measured_air_pressure = 0;
-		lps22hb.cal_reference_air_pressure = 0;
+		lps22hb.cal_actual_air_pressure = 0;
 
 		eeprom_write_calibration();
 
@@ -76,17 +76,17 @@ void eeprom_read_calibration(void) {
 	}
 
 	lps22hb.cal_measured_air_pressure = page[CALIBRATION_MEASURED_AIR_PRESSURE_POS];
-	lps22hb.cal_reference_air_pressure = page[CALIBRATION_REFERENCE_AIR_PRESSURE_POS];
+	lps22hb.cal_actual_air_pressure = page[CALIBRATION_ACTUAL_AIR_PRESSURE_POS];
 }
 
 int16_t get_cal_offset(int32_t measured_air_pressure,
-                       int32_t reference_air_pressure) {
+                       int32_t actual_air_pressure) {
 	/*
 	 * Offset = 16 (16*256 = 4096) implies pressure difference of 1 mbar (4096 counts = 1 mbar)
 	 *
 	 * Offset = (((measured - reference) / 0.1) * 1.6) / 1000
 	 */
-	int64_t cal_offset_i64 = (measured_air_pressure - reference_air_pressure) * 10 * 16;
+	int64_t cal_offset_i64 = (measured_air_pressure - actual_air_pressure) * 10 * 16;
 
 	return (int16_t)(cal_offset_i64 / 10000);
 }
@@ -99,7 +99,8 @@ void lps22hb_init(void) {
 	lps22hb.temperature = 0;
 	lps22hb.air_pressure = 0;
 	lps22hb.cal_measured_air_pressure = 0;
-	lps22hb.cal_reference_air_pressure = 0;
+	lps22hb.cal_actual_air_pressure = 0;
+	lps22hb.cal_changed = false;
 	lps22hb.reference_air_pressure = (int32_t)DEFAULT_REFERENCE_AIR_PRESSURE;
 
 	// Load calibration from flash
@@ -108,8 +109,16 @@ void lps22hb_init(void) {
 	// Get the air pressure calibration offset value
 	lps22hb.cal_offset = \
 		get_cal_offset(lps22hb.cal_measured_air_pressure,
-		               lps22hb.cal_reference_air_pressure);
+		               lps22hb.cal_actual_air_pressure);
 
+	moving_average_init(&lps22hb.moving_average_altitude, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
+	moving_average_init(&lps22hb.moving_average_temperature, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
+	moving_average_init(&lps22hb.moving_average_air_pressure, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
+
+	lps22hb_init_spi();
+}
+
+void lps22hb_init_spi(void) {
 	// Initialise SPI FIFO
 	lps22hb.spi_fifo.baudrate = LPS22HB_SPI_BAUDRATE;
 	lps22hb.spi_fifo.channel = LPS22HB_USIC_SPI;
@@ -177,10 +186,6 @@ void lps22hb_init(void) {
 	spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
 
 	lps22hb.sm = SM_INIT;
-
-	moving_average_init(&lps22hb.moving_average_altitude, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
-	moving_average_init(&lps22hb.moving_average_temperature, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
-	moving_average_init(&lps22hb.moving_average_air_pressure, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
 }
 
 void lps22hb_tick(void) {
@@ -188,7 +193,7 @@ void lps22hb_tick(void) {
 	SPIFifoState fs = spi_fifo_next_state(&lps22hb.spi_fifo);
 
 	if(fs & SPI_FIFO_STATE_ERROR) {
-		lps22hb_init();
+		lps22hb_init_spi();
 
 		return;
 	}
@@ -314,6 +319,29 @@ void lps22hb_tick(void) {
 				lps22hb.air_pressure = moving_average_handle_value(&lps22hb.moving_average_air_pressure, air_pressure);
 			}
 
+			if(lps22hb.cal_changed) {
+				// Apply calibration
+				lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_RPDS_L);
+				lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.cal_offset & 0x00FF); // LSB
+				lps22hb.spi_fifo_buf[2] = (uint8_t)((lps22hb.cal_offset & 0xFF00) >> 8); // MSB
+
+				XMC_USIC_CH_RXFIFO_Flush(lps22hb.spi_fifo.channel);
+				spi_fifo_transceive(&lps22hb.spi_fifo, 3, &lps22hb.spi_fifo_buf[0]);
+
+				lps22hb.sm = SM_SET_CALIBRATION;
+			}
+			else {
+				// Start new conversion cycle
+				lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
+				lps22hb.spi_fifo_buf[1] = (LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT | LPS22HB_REG_CTRL_REG2_MSK_IF_ADD_INC);
+
+				XMC_USIC_CH_RXFIFO_Flush(lps22hb.spi_fifo.channel);
+				spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
+
+				lps22hb.sm = SM_CHECK_STATUS;
+			}
+		}
+		else if(lps22hb.sm == SM_SET_CALIBRATION) {
 			// Start new conversion cycle
 			lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
 			lps22hb.spi_fifo_buf[1] = (LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT | LPS22HB_REG_CTRL_REG2_MSK_IF_ADD_INC);
@@ -321,7 +349,10 @@ void lps22hb_tick(void) {
 			XMC_USIC_CH_RXFIFO_Flush(lps22hb.spi_fifo.channel);
 			spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
 
+			lps22hb.cal_changed = false;
 			lps22hb.sm = SM_CHECK_STATUS;
+		} else {
+			lps22hb_init();
 		}
 	}
 }

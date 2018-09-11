@@ -29,7 +29,7 @@
 #define CALIBRATION_MAGIC 0x12345678
 #define CALIBRATION_MAGIC_POS 0
 #define CALIBRATION_MEASURED_AIR_PRESSURE_POS 1
-#define CALIBRATION_REFERENCE_AIR_PRESSURE_POS 2
+#define CALIBRATION_ACTUAL_AIR_PRESSURE_POS 2
 
 #define LPS22HB_REG_ADDR_INTERRUPT_CFG 0x0B
 #define LPS22HB_REG_ADDR_THS_P_L 0x0C
@@ -92,7 +92,8 @@ typedef struct {
 typedef enum {
 	SM_INIT = 0,
 	SM_CHECK_STATUS,
-	SM_READ_SENSOR_DATA
+	SM_READ_SENSOR_DATA,
+	SM_SET_CALIBRATION
 } LPS22HBSM_t;
 
 typedef struct {
@@ -105,7 +106,8 @@ typedef struct {
 	int32_t reference_air_pressure;
 	int16_t cal_offset;
 	int32_t cal_measured_air_pressure;
-	int32_t cal_reference_air_pressure;
+	int32_t cal_actual_air_pressure;
+	bool cal_changed;
 	MovingAverage moving_average_altitude;
 	MovingAverage moving_average_temperature;
 	MovingAverage moving_average_air_pressure;
@@ -114,6 +116,7 @@ typedef struct {
 extern LPS22HB_t lps22hb;
 
 void lps22hb_init(void);
+void lps22hb_init_spi(void);
 void lps22hb_tick(void);
 
 int32_t lps22hb_get_air_pressure(void);
@@ -123,5 +126,5 @@ int32_t lps22hb_get_temperature(void);
 void eeprom_read_calibration(void);
 void eeprom_write_calibration(void);
 int16_t get_cal_offset(int32_t measured_air_pressure,
-                       int32_t reference_air_pressure);
+                       int32_t actual_air_pressure);
 #endif
