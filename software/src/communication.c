@@ -61,7 +61,7 @@ BootloaderHandleMessageResponse set_moving_average_configuration(const SetMoving
 	   (data->moving_average_length_air_pressure < 1) ||
 	   (data->moving_average_length_altitude < 1) ||
 	   (data->moving_average_length_temperature < 1)) {
-			return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
+		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
 	moving_average_new_length(&lps22hb.moving_average_air_pressure, data->moving_average_length_air_pressure);
@@ -81,7 +81,7 @@ BootloaderHandleMessageResponse get_moving_average_configuration(const GetMoving
 }
 
 BootloaderHandleMessageResponse set_reference_air_pressure(const SetReferenceAirPressure *data) {
-	if((data->air_pressure < 260000 || data->air_pressure > 1260000) && (data->air_pressure > 0)) {
+	if(data->air_pressure < 260000 || data->air_pressure > 1260000) {
 		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
@@ -103,12 +103,13 @@ BootloaderHandleMessageResponse get_reference_air_pressure(const GetReferenceAir
 }
 
 BootloaderHandleMessageResponse set_calibration(const SetCalibration *data) {
-	if(((data->measured_air_pressure < 260000) ||
-	    (data->measured_air_pressure > 1260000) ||
-	    (data->reference_air_pressure < 260000) ||
-	    (data->reference_air_pressure > 1260000)) &&
-	    (data->measured_air_pressure > 0 && data->reference_air_pressure > 0)) {
-			return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
+	if((data->measured_air_pressure < 260000 ||
+	    data->measured_air_pressure > 1260000 ||
+	    data->actual_air_pressure < 260000 ||
+	    data->actual_air_pressure > 1260000) &&
+	   (data->measured_air_pressure != 0 ||
+	    data->actual_air_pressure != 0)) {
+		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
 	// Save to RAM
