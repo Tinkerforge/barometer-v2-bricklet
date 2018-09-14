@@ -21,7 +21,7 @@ Module ExampleCallback
         ' Register air pressure callback to subroutine AirPressureCB
         AddHandler b.AirPressureCallback, AddressOf AirPressureCB
 
-        ' Set period for air_pressure callback to 1s (1000ms) without a threshold
+        ' Set period for air pressure callback to 1s (1000ms) without a threshold
         b.SetAirPressureCallbackConfiguration(1000, False, "x"C, 0, 0)
 
         Console.WriteLine("Press key to exit")

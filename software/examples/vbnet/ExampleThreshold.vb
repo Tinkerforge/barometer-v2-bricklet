@@ -22,7 +22,7 @@ Module ExampleThreshold
         ' Register air pressure callback to subroutine AirPressureCB
         AddHandler b.AirPressureCallback, AddressOf AirPressureCB
 
-        ' Configure threshold for air_pressure "greater than 1025 mbar"
+        ' Configure threshold for air pressure "greater than 1025 mbar"
         ' with a debounce period of 1s (1000ms)
         b.SetAirPressureCallbackConfiguration(1000, False, ">"C, 1025*1000, 0)
 
