@@ -55,4 +55,6 @@
 #define LPS22HB_RX_FIFO_SIZE         XMC_USIC_CH_FIFO_SIZE_16WORDS
 #define LPS22HB_TX_FIFO_SIZE         XMC_USIC_CH_FIFO_SIZE_16WORDS
 
+#define LPS22HB_INT_PIN              P0_5
+
 #endif

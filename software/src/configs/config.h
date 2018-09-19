@@ -35,8 +35,12 @@
 
 #define CALLBACK_VALUE_TYPE CALLBACK_VALUE_TYPE_INT32
 
+// The moving average is used for a signed 24bit air pressure value (divided by 4.096)
+// and a signed 16bit temperature value. Because the following is true the sum type
+// can be int32_t: (((1 << 23) * 1000) / 4096) * 1000 < (1 << 31)
+
 #define MOVING_AVERAGE_TYPE MOVING_AVERAGE_TYPE_INT32
-#define MOVING_AVERAGE_SUM_TYPE MOVING_AVERAGE_TYPE_INT64
+#define MOVING_AVERAGE_SUM_TYPE MOVING_AVERAGE_TYPE_INT32
 #define MOVING_AVERAGE_MAX_LENGTH 1000
 #define MOVING_AVERAGE_DEFAULT_LENGTH 100
 

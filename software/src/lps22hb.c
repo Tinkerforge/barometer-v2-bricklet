@@ -26,11 +26,17 @@
 #include "bricklib2/logging/logging.h"
 #include "bricklib2/bootloader/bootloader.h"
 #include "bricklib2/hal/system_timer/system_timer.h"
+#include "bricklib2/os/coop_task.h"
 
 LPS22HB_t lps22hb;
+static CoopTask lps22hb_task;
 
-// Air pressure in mbar/1000
-const AltitudeFactor altitude_factors[] = {
+typedef struct {
+	int32_t air_pressure; // mbar/1000
+	int32_t factor; // altitude difference in mm per mbar/1000 air pressure difference
+} AltitudeFactor;
+
+static const AltitudeFactor altitude_factors[] = {
 	[0] = {1225005, 14},
 	[1] = {1118311, 13},
 	[2] = {1012049, 12},
@@ -41,14 +47,27 @@ const AltitudeFactor altitude_factors[] = {
 	[7] = {520296, 7}
 };
 
-void eeprom_write_calibration(void) {
-	logd("[+] B2: eeprom_write_calibration()\n\r");
+static const uint8_t odr_msk[] = {
+	0, // Off
+	LPS22HB_REG_CTRL_REG1_MSK_ODR_0, // 1Hz
+	LPS22HB_REG_CTRL_REG1_MSK_ODR_1, // 10Hz
+	LPS22HB_REG_CTRL_REG1_MSK_ODR_1 | LPS22HB_REG_CTRL_REG1_MSK_ODR_0, // 25Hz
+	LPS22HB_REG_CTRL_REG1_MSK_ODR_2, // 50Hz
+	LPS22HB_REG_CTRL_REG1_MSK_ODR_2 | LPS22HB_REG_CTRL_REG1_MSK_ODR_0, // 75Hz
+};
 
+static const uint8_t lpfp_msk[] = {
+	0, // Off
+	LPS22HB_REG_CTRL_REG1_MSK_EN_LPFP, // 1/9th
+	LPS22HB_REG_CTRL_REG1_MSK_EN_LPFP | LPS22HB_REG_CTRL_REG1_MSK_LPFP_CFG, // 1/20th
+};
+
+void eeprom_write_calibration(void) {
 	uint32_t page[EEPROM_PAGE_SIZE/sizeof(uint32_t)];
 
 	page[CALIBRATION_MAGIC_POS] = CALIBRATION_MAGIC;
-	page[CALIBRATION_MEASURED_AIR_PRESSURE_POS] = lps22hb.cal_measured_air_pressure;
-	page[CALIBRATION_ACTUAL_AIR_PRESSURE_POS] = lps22hb.cal_actual_air_pressure;
+	page[CALIBRATION_MEASURED_AIR_PRESSURE_POS] = lps22hb.measured_air_pressure;
+	page[CALIBRATION_ACTUAL_AIR_PRESSURE_POS] = lps22hb.actual_air_pressure;
 
 	if(!bootloader_write_eeprom_page(CALIBRATION_PAGE, page)) {
 		// TODO: Error handling?
@@ -57,8 +76,6 @@ void eeprom_write_calibration(void) {
 }
 
 void eeprom_read_calibration(void) {
-	logd("[+] B2: eeprom_read_calibration()\n\r");
-
 	uint32_t page[EEPROM_PAGE_SIZE/sizeof(uint32_t)];
 
 	bootloader_read_eeprom_page(CALIBRATION_PAGE, page);
@@ -67,53 +84,47 @@ void eeprom_read_calibration(void) {
 	// This is either our first startup or something went wrong.
 	// We initialize the calibration data with sane default values.
 	if(page[0] != CALIBRATION_MAGIC) {
-		lps22hb.cal_measured_air_pressure = 0;
-		lps22hb.cal_actual_air_pressure = 0;
+		lps22hb.measured_air_pressure = 0;
+		lps22hb.actual_air_pressure = 0;
 
 		eeprom_write_calibration();
 
 		return;
 	}
 
-	lps22hb.cal_measured_air_pressure = page[CALIBRATION_MEASURED_AIR_PRESSURE_POS];
-	lps22hb.cal_actual_air_pressure = page[CALIBRATION_ACTUAL_AIR_PRESSURE_POS];
+	lps22hb.measured_air_pressure = page[CALIBRATION_MEASURED_AIR_PRESSURE_POS];
+	lps22hb.actual_air_pressure = page[CALIBRATION_ACTUAL_AIR_PRESSURE_POS];
 }
 
-int16_t get_cal_offset(int32_t measured_air_pressure,
-                       int32_t actual_air_pressure) {
-	/*
-	 * Offset = 16 (16*256 = 4096) implies pressure difference of 1 mbar (4096 counts = 1 mbar)
-	 *
-	 * Offset = (((measured - reference) / 0.1) * 1.6) / 1000
-	 */
-	int64_t cal_offset_i64 = (measured_air_pressure - actual_air_pressure) * 10 * 16;
-
-	return (int16_t)(cal_offset_i64 / 10000);
+int16_t lps22hb_get_cal_offset(int32_t measured_air_pressure,
+                               int32_t actual_air_pressure) {
+	// Offset = 16 (16*256 = 4096) implies pressure difference of 1 mbar (4096 counts = 1 mbar)
+	// Offset = (((measured - actual) / 0.1) * 1.6) / 1000
+	return ((measured_air_pressure - actual_air_pressure) * 10 * 16) / 10000;
 }
 
 void lps22hb_init(void) {
-	logd("[+] B2: lps22hb_init()\n\r");
+	memset(&lps22hb, 0, sizeof(lps22hb));
 
-	lps22hb.altitude = 0;
-	lps22hb.cal_offset = 0;
-	lps22hb.temperature = 0;
-	lps22hb.air_pressure = 0;
-	lps22hb.cal_measured_air_pressure = 0;
-	lps22hb.cal_actual_air_pressure = 0;
-	lps22hb.cal_changed = false;
-	lps22hb.reference_air_pressure = (int32_t)DEFAULT_REFERENCE_AIR_PRESSURE;
+	lps22hb.reference_air_pressure = DEFAULT_REFERENCE_AIR_PRESSURE;
 
-	// Load calibration from flash
 	eeprom_read_calibration();
 
-	// Get the air pressure calibration offset value
-	lps22hb.cal_offset = \
-		get_cal_offset(lps22hb.cal_measured_air_pressure,
-		               lps22hb.cal_actual_air_pressure);
+	lps22hb.data_rate = 4; // 50Hz
+	lps22hb.air_pressure_low_pass_filter = 1; // 1/9th
+	lps22hb.reconfigure = true;
 
-	moving_average_init(&lps22hb.moving_average_altitude, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
-	moving_average_init(&lps22hb.moving_average_temperature, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
 	moving_average_init(&lps22hb.moving_average_air_pressure, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
+	moving_average_init(&lps22hb.moving_average_temperature, 0, MOVING_AVERAGE_DEFAULT_LENGTH);
+
+	const XMC_GPIO_CONFIG_t int_pin_config = {
+		.mode             = XMC_GPIO_MODE_INPUT_PULL_UP,
+		.input_hysteresis = XMC_GPIO_INPUT_HYSTERESIS_STANDARD
+	};
+
+	XMC_GPIO_Init(LPS22HB_INT_PIN, &int_pin_config);
+
+	coop_task_init(&lps22hb_task, lps22hb_tick_task);
 
 	lps22hb_init_spi();
 }
@@ -151,209 +162,194 @@ void lps22hb_init_spi(void) {
 
 	spi_fifo_init(&lps22hb.spi_fifo);
 
-	// Configure the sensor
-
-	// Boot and software reset of the sensor
-	lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
-	lps22hb.spi_fifo_buf[1] = LPS22HB_REG_CTRL_REG2_MSK_BOOT | LPS22HB_REG_CTRL_REG2_MSK_SWRESET;
-
-	spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
-	system_timer_sleep_ms(8);
-	spi_fifo_next_state(&lps22hb.spi_fifo);
-	spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 2);
-
-	// Output registers not updated until they are read, must read register PRESS_OUT_H last
-	lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG1);
-	lps22hb.spi_fifo_buf[1] = LPS22HB_REG_CTRL_REG1_MSK_BDU;
-
-	spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
-	system_timer_sleep_ms(4);
-	spi_fifo_next_state(&lps22hb.spi_fifo);
-	spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 2);
-
-	// Apply calibration
-	lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_RPDS_L);
-	lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.cal_offset & 0x00FF); // LSB
-	lps22hb.spi_fifo_buf[2] = (uint8_t)(((lps22hb.cal_offset & 0xFF00) >> 8)); // MSB
-
-	spi_fifo_transceive(&lps22hb.spi_fifo, 3, &lps22hb.spi_fifo_buf[0]);
-	system_timer_sleep_ms(4);
-	spi_fifo_next_state(&lps22hb.spi_fifo);
-	spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 3);
-
-	// Start initial conversion
-	lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
-	lps22hb.spi_fifo_buf[1] = (LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT | LPS22HB_REG_CTRL_REG2_MSK_IF_ADD_INC);
-
-	spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
-
-	lps22hb.sm = SM_INIT;
+	lps22hb.reconfigure = true;
 }
 
 void lps22hb_tick(void) {
-	static bool first_value = true;
-	SPIFifoState fs = spi_fifo_next_state(&lps22hb.spi_fifo);
+	coop_task_tick(&lps22hb_task);
+}
 
-	if(fs & SPI_FIFO_STATE_ERROR) {
-		lps22hb_init_spi();
+// NOTE: assumes SPI FIFO is idle/ready
+static bool lps22hb_transceive_task(uint8_t *buffer, const uint8_t length) {
+	SPIFifo *spi_fifo = &lps22hb.spi_fifo;
 
-		return;
+	spi_fifo_transceive(spi_fifo, length, buffer);
+
+	while (true) {
+		SPIFifoState state = spi_fifo_next_state(spi_fifo);
+
+		if (state & SPI_FIFO_STATE_ERROR) {
+			goto error;
+		}
+
+		if (state == SPI_FIFO_STATE_TRANSCEIVE_READY) {
+			break;
+		}
+
+		coop_task_yield();
 	}
 
-	if(fs == SPI_FIFO_STATE_TRANSCEIVE_READY) {
-		if(lps22hb.sm == SM_INIT) {
-			spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 2);
+	if (spi_fifo_read_fifo(spi_fifo, buffer, length) != length) {
+		goto error;
+	}
 
-			lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
-			lps22hb.spi_fifo_buf[1] = 0x00;
+	coop_task_yield();
 
-			spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
+	return true;
 
-			lps22hb.sm = SM_CHECK_STATUS;
+error:
+	coop_task_yield();
+	lps22hb_init_spi();
+
+	return false;
+}
+
+void lps22hb_tick_task(void) {
+	static bool reset_moving_averages = true;
+	static uint8_t drop_next_reading = 0;
+	static uint8_t altitude_factors_count = sizeof(altitude_factors) / sizeof(altitude_factors[0]);
+	uint8_t buffer[6];
+
+	while (true) {
+		if (lps22hb.reconfigure || lps22hb.calibration_changed) {
+			// Reset of the sensor and clear its memory
+			buffer[0] = LPS22HB_GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
+			buffer[1] = LPS22HB_REG_CTRL_REG2_MSK_BOOT | LPS22HB_REG_CTRL_REG2_MSK_SWRESET;
+
+			if (!lps22hb_transceive_task(buffer, 2)) {
+				continue;
+			}
+
+			// Wait for reset to complete
+			while (true) {
+				buffer[0] = LPS22HB_GET_READ_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
+				buffer[1] = 0;
+
+				if (!lps22hb_transceive_task(buffer, 2)) {
+					continue;
+				}
+
+				if ((buffer[1] & (LPS22HB_REG_CTRL_REG2_MSK_BOOT | LPS22HB_REG_CTRL_REG2_MSK_SWRESET)) == 0) {
+					break;
+				}
+
+				coop_task_sleep_ms(1);
+			}
+
+			// Configure interrupt pin as active-low open-drain for the the data-ready signal
+			buffer[0] = LPS22HB_GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG3);
+			buffer[1] = LPS22HB_REG_CTRL_REG3_MSK_INT_H_L | LPS22HB_REG_CTRL_REG3_MSK_PP_OD | LPS22HB_REG_CTRL_REG3_MSK_DRDY;
+
+			if (!lps22hb_transceive_task(buffer, 2)) {
+				continue;
+			}
+
+			// Apply calibration
+			int16_t cal_offset = lps22hb_get_cal_offset(lps22hb.measured_air_pressure,
+			                                            lps22hb.actual_air_pressure);
+
+			buffer[0] = LPS22HB_GET_WRITE_ADDR(LPS22HB_REG_ADDR_RPDS_L);
+			buffer[1] = (uint8_t)(cal_offset & 0x00FF); // LSB
+			buffer[2] = (uint8_t)((cal_offset & 0xFF00) >> 8); // MSB
+
+			if (!lps22hb_transceive_task(buffer, 3)) {
+				continue;
+			}
+
+			if (lps22hb.calibration_changed) {
+				lps22hb.calibration_changed = false;
+				reset_moving_averages = true;
+			}
+
+			// Set data-rate, low-pass-filter and enable block-data-update
+			buffer[0] = LPS22HB_GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG1);
+			buffer[1] = odr_msk[lps22hb.data_rate] | lpfp_msk[lps22hb.air_pressure_low_pass_filter];
+
+			if (!lps22hb_transceive_task(buffer, 2)) {
+				continue;
+			}
+
+			// Reset low-pass filter to avoid transition phase
+			buffer[0] = LPS22HB_GET_READ_ADDR(LPS22HB_REG_ADDR_LPFP_RES);
+			buffer[1] = 0;
+
+			if (!lps22hb_transceive_task(buffer, 2)) {
+				continue;
+			}
+
+			// FIXME: The low-pass filter reset doesn't seem to work correctly
+			//        at 75Hz data rate. Work around this by droping the next
+			//        30 reading to ignore the transitiopn phase
+			if (lps22hb.data_rate == 5) { // 75Hz
+				drop_next_reading = 30;
+			}
+
+			lps22hb.reconfigure = false;
 		}
-		else if(lps22hb.sm == SM_CHECK_STATUS) {
-			spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 2);
 
-			if (!(lps22hb.spi_fifo_buf[1] & LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT)) {
-				lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_PRESS_OUT_XL);
-				lps22hb.spi_fifo_buf[1] = 0x00;
-				lps22hb.spi_fifo_buf[2] = 0x00;
-				lps22hb.spi_fifo_buf[3] = 0x00;
-				lps22hb.spi_fifo_buf[4] = 0x00;
-				lps22hb.spi_fifo_buf[5] = 0x00;
+		if (XMC_GPIO_GetInput(LPS22HB_INT_PIN) == 0) {
+			buffer[0] = LPS22HB_GET_READ_ADDR(LPS22HB_REG_ADDR_PRESS_OUT_XL);
+			buffer[1] = 0;
+			buffer[2] = 0;
+			buffer[3] = 0;
+			buffer[4] = 0;
+			buffer[5] = 0;
 
-				spi_fifo_transceive(&lps22hb.spi_fifo, 6, &lps22hb.spi_fifo_buf[0]);
-
-				lps22hb.sm = SM_READ_SENSOR_DATA;
-			}
-			else {
-				lps22hb.spi_fifo_buf[0] = GET_READ_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
-				lps22hb.spi_fifo_buf[1] = 0x00;
-
-				spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
-			}
-		}
-		else if(lps22hb.sm == SM_READ_SENSOR_DATA) {
-			// Read and process the data
-			spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 6);
-
-			uint8_t upper = 7;
-			uint8_t lower = 0;
-			int32_t delta = 0;
-			int64_t factor = 0;
-			int32_t total_delta = 0;
-			int32_t upper_delta = 0;
-			int32_t lower_delta = 0;
-			int64_t air_pressure_i64 = 0;
-
-			int32_t altitude = 0;
-			int32_t temperature = ((lps22hb.spi_fifo_buf[5] << 8) | lps22hb.spi_fifo_buf[4]);
-			int32_t air_pressure = \
-				((lps22hb.spi_fifo_buf[3] << 16) | (lps22hb.spi_fifo_buf[2] << 8) | lps22hb.spi_fifo_buf[1]);
-
-			if((lps22hb.spi_fifo_buf[3] & 0x80)) {
-				// Negative number, apply two's complement
-				air_pressure &= ~(1 << 23); // Clear indicator bit
-				air_pressure = (~(air_pressure)) + 1;
-				air_pressure |= 0xFF000000;
+			if (!lps22hb_transceive_task(buffer, 6)) {
+				continue;
 			}
 
-			if((lps22hb.spi_fifo_buf[5] & 0x80)) {
-				// Negative number, apply two's complement
-				temperature &= ~(1 << 15); // Clear indicator bit
-				temperature = (~(temperature)) + 1;
-				temperature |= 0xFFFF0000;
-			}
-
-			air_pressure_i64 = air_pressure * 10;
-			air_pressure_i64 = air_pressure_i64 * 10;
-			air_pressure_i64 = air_pressure_i64 * 10;
-			air_pressure = (int32_t)(air_pressure_i64 >> 12); // Divided by 4096
-
-			// Calculate altitude from the current air pressure
-			while(upper > 0 && (air_pressure > altitude_factors[upper].air_pressure)) {
-				upper--;
-			}
-
-			delta = lps22hb.reference_air_pressure - air_pressure;
-
-			if(upper < 7) {
-				lower = upper + 1;
-
-				total_delta = altitude_factors[upper].air_pressure - altitude_factors[lower].air_pressure;
-				upper_delta = altitude_factors[upper].air_pressure - air_pressure;
-				lower_delta = air_pressure - altitude_factors[lower].air_pressure;
-				factor = ((altitude_factors[upper].factor) * lower_delta +
-						  (altitude_factors[lower].factor) * upper_delta) / total_delta;
-
-				altitude = (int32_t)(delta * factor);
+			if (drop_next_reading > 0) {
+				--drop_next_reading;
 			} else {
-				lower = upper;
-				altitude = (int32_t)(delta * altitude_factors[upper].factor);
-			}
+				// Divide by 4096 to get mbar and multiple by 1000 to get mbar/1000.
+				// reduce the factor from 1000 / 4096 to 125 / 512 to avoid int32_t overflow
+				int32_t air_pressure = (((int32_t)(((uint32_t)buffer[3] << 24) | ((uint32_t)buffer[2] << 16) | ((uint32_t)buffer[1] << 8)) >> 8) * 125) / 512;
+				int16_t temperature = (int16_t)(((uint16_t)buffer[5] << 8) | (uint16_t)buffer[4]);
 
-			if(first_value) {
-				// If this is the first real measurement we reinitialize the moving average.
-				// Otherwise it would slowly ramp up from 0 to the real value for the user.
-				moving_average_init(&lps22hb.moving_average_altitude,
-				                    altitude,
-				                    lps22hb.moving_average_altitude.length);
+				if (reset_moving_averages) {
+					// If this is the first real measurement we reinitialize the moving average.
+					// Otherwise it would slowly ramp up from 0 to the real value for the user.
+					moving_average_init(&lps22hb.moving_average_air_pressure, air_pressure,
+					                    lps22hb.moving_average_air_pressure.length);
 
-				moving_average_init(&lps22hb.moving_average_temperature,
-				                    temperature,
-				                    lps22hb.moving_average_temperature.length);
+					moving_average_init(&lps22hb.moving_average_temperature, temperature,
+					                    lps22hb.moving_average_temperature.length);
 
-				moving_average_init(&lps22hb.moving_average_air_pressure,
-				                    air_pressure,
-				                    lps22hb.moving_average_air_pressure.length);
+					reset_moving_averages = false;
+				}
 
-				lps22hb.altitude = altitude;
-				lps22hb.temperature = temperature;
-				lps22hb.air_pressure = air_pressure;
-
-				first_value = false;
-			}
-			else {
-				// Put temperature and humidity measurements through moving average filter.
-				lps22hb.altitude = moving_average_handle_value(&lps22hb.moving_average_altitude, altitude);
-				lps22hb.temperature = moving_average_handle_value(&lps22hb.moving_average_temperature, temperature);
+				// Put air pressure and temperature measurements through moving average filter.
 				lps22hb.air_pressure = moving_average_handle_value(&lps22hb.moving_average_air_pressure, air_pressure);
-			}
+				lps22hb.temperature = moving_average_handle_value(&lps22hb.moving_average_temperature, temperature);
 
-			if(lps22hb.cal_changed) {
-				// Apply calibration
-				lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_RPDS_L);
-				lps22hb.spi_fifo_buf[1] = (uint8_t)(lps22hb.cal_offset & 0x00FF); // LSB
-				lps22hb.spi_fifo_buf[2] = (uint8_t)((lps22hb.cal_offset & 0xFF00) >> 8); // MSB
+				// Calculate altitude from the current air pressure
+				uint8_t upper = altitude_factors_count - 1;
+				uint8_t lower;
 
-				spi_fifo_transceive(&lps22hb.spi_fifo, 3, &lps22hb.spi_fifo_buf[0]);
+				while (upper > 0 && lps22hb.air_pressure > altitude_factors[upper].air_pressure) {
+					upper--;
+				}
 
-				lps22hb.sm = SM_SET_CALIBRATION;
-			}
-			else {
-				// Start new conversion cycle
-				lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
-				lps22hb.spi_fifo_buf[1] = (LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT | LPS22HB_REG_CTRL_REG2_MSK_IF_ADD_INC);
+				int32_t reference_delta = lps22hb.reference_air_pressure - lps22hb.air_pressure; // mbar/1000
 
-				spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
+				if (upper < altitude_factors_count - 1) {
+					lower = upper + 1;
 
-				lps22hb.sm = SM_CHECK_STATUS;
+					int32_t total_delta = altitude_factors[upper].air_pressure - altitude_factors[lower].air_pressure;
+					int32_t upper_delta = altitude_factors[upper].air_pressure - lps22hb.air_pressure;
+					int32_t lower_delta = lps22hb.air_pressure - altitude_factors[lower].air_pressure;
+					int32_t factor = altitude_factors[upper].factor * lower_delta +
+					                 altitude_factors[lower].factor * upper_delta;
+
+					lps22hb.altitude = ((int64_t)reference_delta * (int64_t)factor) / total_delta;
+				} else {
+					lps22hb.altitude = reference_delta * altitude_factors[upper].factor;
+				}
 			}
 		}
-		else if(lps22hb.sm == SM_SET_CALIBRATION) {
-			spi_fifo_read_fifo(&lps22hb.spi_fifo, &lps22hb.spi_fifo_buf[0], 3);
 
-			// Start new conversion cycle
-			lps22hb.spi_fifo_buf[0] = GET_WRITE_ADDR(LPS22HB_REG_ADDR_CTRL_REG2);
-			lps22hb.spi_fifo_buf[1] = (LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT | LPS22HB_REG_CTRL_REG2_MSK_IF_ADD_INC);
-
-			spi_fifo_transceive(&lps22hb.spi_fifo, 2, &lps22hb.spi_fifo_buf[0]);
-
-			lps22hb.cal_changed = false;
-			lps22hb.sm = SM_CHECK_STATUS;
-		} else {
-			lps22hb_init();
-		}
+		coop_task_yield();
 	}
 }
 

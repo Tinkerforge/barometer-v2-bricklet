@@ -55,62 +55,64 @@
 #define LPS22HB_REG_ADDR_TEMP_OUT_H 0x2C
 #define LPS22HB_REG_ADDR_LPFP_RES 0x33
 
-#define LPS22HB_REG_CTRL_REG1_MSK_SIM 0x01
-#define LPS22HB_REG_CTRL_REG1_MSK_BDU 0x02
-#define LPS22HB_REG_CTRL_REG1_MSK_LPFP_CFG 0x01
-#define LPS22HB_REG_CTRL_REG1_MSK_EN_LPFP 0x01
-#define LPS22HB_REG_CTRL_REG1_MSK_ODR_PD_ONE_SHOT 0x00
-#define LPS22HB_REG_CTRL_REG1_MSK_ODR_1HZ 0x010
-#define LPS22HB_REG_CTRL_REG1_MSK_ODR_10HZ 0x020
-#define LPS22HB_REG_CTRL_REG1_MSK_ODR_25HZ 0x30
-#define LPS22HB_REG_CTRL_REG1_MSK_ODR_50HZ 0x40
-#define LPS22HB_REG_CTRL_REG1_MSK_ODR_75HZ 0x50
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_PHE       (1 << 0)
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_PLE       (1 << 1)
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_LIR       (1 << 2)
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_DIFF_EN   (1 << 3)
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_RESET_AZ  (1 << 4)
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_AUTOZERO  (1 << 5)
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_RESET_ARP (1 << 6)
+#define LPS22HB_REG_INTERRUPT_CFG_MSK_AUTORIFP  (1 << 7)
 
-#define LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT 0x01
-#define LPS22HB_REG_CTRL_REG2_MSK_SWRESET 0x04
-#define LPS22HB_REG_CTRL_REG2_MSK_I2C_DIS 0x08
-#define LPS22HB_REG_CTRL_REG2_MSK_IF_ADD_INC 0x10
-#define LPS22HB_REG_CTRL_REG2_MSK_STOP_ON_FTH 0x20
-#define LPS22HB_REG_CTRL_REG2_MSK_FIFO_EN 0x30
-#define LPS22HB_REG_CTRL_REG2_MSK_BOOT 0x40
+#define LPS22HB_REG_CTRL_REG1_MSK_SIM           (1 << 0)
+#define LPS22HB_REG_CTRL_REG1_MSK_BDU           (1 << 1)
+#define LPS22HB_REG_CTRL_REG1_MSK_LPFP_CFG      (1 << 2)
+#define LPS22HB_REG_CTRL_REG1_MSK_EN_LPFP       (1 << 3)
+#define LPS22HB_REG_CTRL_REG1_MSK_ODR_0         (1 << 4)
+#define LPS22HB_REG_CTRL_REG1_MSK_ODR_1         (1 << 5)
+#define LPS22HB_REG_CTRL_REG1_MSK_ODR_2         (1 << 6)
+
+#define LPS22HB_REG_CTRL_REG2_MSK_ONE_SHOT      (1 << 0)
+#define LPS22HB_REG_CTRL_REG2_MSK_SWRESET       (1 << 2)
+#define LPS22HB_REG_CTRL_REG2_MSK_I2C_DIS       (1 << 3)
+#define LPS22HB_REG_CTRL_REG2_MSK_IF_ADD_INC    (1 << 4)
+#define LPS22HB_REG_CTRL_REG2_MSK_STOP_ON_FTH   (1 << 5)
+#define LPS22HB_REG_CTRL_REG2_MSK_FIFO_EN       (1 << 6)
+#define LPS22HB_REG_CTRL_REG2_MSK_BOOT          (1 << 7)
+
+#define LPS22HB_REG_CTRL_REG3_MSK_INT_S1        (1 << 0)
+#define LPS22HB_REG_CTRL_REG3_MSK_INT_S2        (1 << 1)
+#define LPS22HB_REG_CTRL_REG3_MSK_DRDY          (1 << 2)
+#define LPS22HB_REG_CTRL_REG3_MSK_F_OVR         (1 << 3)
+#define LPS22HB_REG_CTRL_REG3_MSK_F_FTH         (1 << 4)
+#define LPS22HB_REG_CTRL_REG3_MSK_F_FSS5        (1 << 5)
+#define LPS22HB_REG_CTRL_REG3_MSK_PP_OD         (1 << 6)
+#define LPS22HB_REG_CTRL_REG3_MSK_INT_H_L       (1 << 7)
 
 #define LPS22HB_REG_STATUS_MSK_P_DA 0x01
 #define LPS22HB_REG_STATUS_MSK_T_DA 0x02
 #define LPS22HB_REG_STATUS_MSK_P_OR 0x10
 #define LPS22HB_REG_STATUS_MSK_T_OR 0x20
 
-#define GET_READ_ADDR(addr) ((addr) + 0x80)
-#define GET_WRITE_ADDR(addr) (addr)
+#define LPS22HB_GET_READ_ADDR(addr) ((addr) + 0x80)
+#define LPS22HB_GET_WRITE_ADDR(addr) (addr)
 
 #define DEFAULT_REFERENCE_AIR_PRESSURE 1013250 // (1013.25 * 1000) mbar
 
 typedef struct {
-	int64_t air_pressure;
-	int64_t factor;
-} AltitudeFactor;
-
-typedef enum {
-	SM_INIT = 0,
-	SM_CHECK_STATUS,
-	SM_READ_SENSOR_DATA,
-	SM_SET_CALIBRATION
-} LPS22HBSM_t;
-
-typedef struct {
-	LPS22HBSM_t sm;
+	int32_t altitude; // mm
+	int32_t temperature; // °C/100
+	int32_t air_pressure; // mbar/1000
+	int32_t reference_air_pressure; // mbar/1000
+	int32_t measured_air_pressure; // mbar/1000
+	int32_t actual_air_pressure; // mbar/1000
+	uint8_t data_rate; // enum
+	uint8_t air_pressure_low_pass_filter; // enum
+	bool reconfigure;
+	bool calibration_changed;
 	SPIFifo spi_fifo;
-	int32_t altitude;
-	int32_t temperature;
-	int32_t air_pressure;
-	uint8_t spi_fifo_buf[16];
-	int32_t reference_air_pressure;
-	int16_t cal_offset;
-	int32_t cal_measured_air_pressure;
-	int32_t cal_actual_air_pressure;
-	bool cal_changed;
-	MovingAverage moving_average_altitude;
-	MovingAverage moving_average_temperature;
 	MovingAverage moving_average_air_pressure;
+	MovingAverage moving_average_temperature;
 } LPS22HB_t;
 
 extern LPS22HB_t lps22hb;
@@ -118,6 +120,7 @@ extern LPS22HB_t lps22hb;
 void lps22hb_init(void);
 void lps22hb_init_spi(void);
 void lps22hb_tick(void);
+void lps22hb_tick_task(void);
 
 int32_t lps22hb_get_air_pressure(void);
 int32_t lps22hb_get_altitude(void);
@@ -125,6 +128,7 @@ int32_t lps22hb_get_temperature(void);
 
 void eeprom_read_calibration(void);
 void eeprom_write_calibration(void);
-int16_t get_cal_offset(int32_t measured_air_pressure,
-                       int32_t actual_air_pressure);
+int16_t lps22hb_get_cal_offset(int32_t measured_air_pressure,
+                               int32_t actual_air_pressure);
+
 #endif

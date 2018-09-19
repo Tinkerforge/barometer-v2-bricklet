@@ -40,6 +40,17 @@ void communication_init(void);
 #define BAROMETER_V2_THRESHOLD_OPTION_SMALLER '<'
 #define BAROMETER_V2_THRESHOLD_OPTION_GREATER '>'
 
+#define BAROMETER_V2_DATA_RATE_OFF 0
+#define BAROMETER_V2_DATA_RATE_1HZ 1
+#define BAROMETER_V2_DATA_RATE_10HZ 2
+#define BAROMETER_V2_DATA_RATE_25HZ 3
+#define BAROMETER_V2_DATA_RATE_50HZ 4
+#define BAROMETER_V2_DATA_RATE_75HZ 5
+
+#define BAROMETER_V2_LOW_PASS_FILTER_OFF 0
+#define BAROMETER_V2_LOW_PASS_FILTER_1_9TH 1
+#define BAROMETER_V2_LOW_PASS_FILTER_1_20TH 2
+
 #define BAROMETER_V2_BOOTLOADER_MODE_BOOTLOADER 0
 #define BAROMETER_V2_BOOTLOADER_MODE_FIRMWARE 1
 #define BAROMETER_V2_BOOTLOADER_MODE_BOOTLOADER_WAIT_FOR_REBOOT 2
@@ -74,6 +85,8 @@ void communication_init(void);
 #define FID_GET_REFERENCE_AIR_PRESSURE 16
 #define FID_SET_CALIBRATION 17
 #define FID_GET_CALIBRATION 18
+#define FID_SET_SENSOR_CONFIGURATION 19
+#define FID_GET_SENSOR_CONFIGURATION 20
 
 #define FID_CALLBACK_AIR_PRESSURE 4
 #define FID_CALLBACK_ALTITUDE 8
@@ -82,7 +95,6 @@ void communication_init(void);
 typedef struct {
 	TFPMessageHeader header;
 	uint16_t moving_average_length_air_pressure;
-	uint16_t moving_average_length_altitude;
 	uint16_t moving_average_length_temperature;
 } __attribute__((__packed__)) SetMovingAverageConfiguration;
 
@@ -93,7 +105,6 @@ typedef struct {
 typedef struct {
 	TFPMessageHeader header;
 	uint16_t moving_average_length_air_pressure;
-	uint16_t moving_average_length_altitude;
 	uint16_t moving_average_length_temperature;
 } __attribute__((__packed__)) GetMovingAverageConfiguration_Response;
 
@@ -127,6 +138,22 @@ typedef struct {
 	int32_t actual_air_pressure;
 } __attribute__((__packed__)) GetCalibration_Response;
 
+typedef struct {
+	TFPMessageHeader header;
+	uint8_t data_rate;
+	uint8_t air_pressure_low_pass_filter;
+} __attribute__((__packed__)) SetSensorConfiguration;
+
+typedef struct {
+	TFPMessageHeader header;
+} __attribute__((__packed__)) GetSensorConfiguration;
+
+typedef struct {
+	TFPMessageHeader header;
+	uint8_t data_rate;
+	uint8_t air_pressure_low_pass_filter;
+} __attribute__((__packed__)) GetSensorConfiguration_Response;
+
 // Function prototypes
 BootloaderHandleMessageResponse set_moving_average_configuration(const SetMovingAverageConfiguration *data);
 BootloaderHandleMessageResponse get_moving_average_configuration(const GetMovingAverageConfiguration *data, GetMovingAverageConfiguration_Response *response);
@@ -134,6 +161,8 @@ BootloaderHandleMessageResponse set_reference_air_pressure(const SetReferenceAir
 BootloaderHandleMessageResponse get_reference_air_pressure(const GetReferenceAirPressure *data, GetReferenceAirPressure_Response *response);
 BootloaderHandleMessageResponse set_calibration(const SetCalibration *data);
 BootloaderHandleMessageResponse get_calibration(const GetCalibration *data, GetCalibration_Response *response);
+BootloaderHandleMessageResponse set_sensor_configuration(const SetSensorConfiguration *data);
+BootloaderHandleMessageResponse get_sensor_configuration(const GetSensorConfiguration *data, GetSensorConfiguration_Response *response);
 
 // Callbacks
 bool handle_air_pressure_callback(void);

@@ -50,22 +50,21 @@ BootloaderHandleMessageResponse handle_message(const void *message, void *respon
 		case FID_GET_REFERENCE_AIR_PRESSURE: return get_reference_air_pressure(message, response);
 		case FID_SET_CALIBRATION: return set_calibration(message);
 		case FID_GET_CALIBRATION: return get_calibration(message, response);
+		case FID_SET_SENSOR_CONFIGURATION: return set_sensor_configuration(message);
+		case FID_GET_SENSOR_CONFIGURATION: return get_sensor_configuration(message, response);
 		default: return HANDLE_MESSAGE_RESPONSE_NOT_SUPPORTED;
 	}
 }
 
 BootloaderHandleMessageResponse set_moving_average_configuration(const SetMovingAverageConfiguration *data) {
 	if((data->moving_average_length_air_pressure > MOVING_AVERAGE_MAX_LENGTH) ||
-	   (data->moving_average_length_altitude > MOVING_AVERAGE_MAX_LENGTH) ||
 	   (data->moving_average_length_temperature > MOVING_AVERAGE_MAX_LENGTH) ||
 	   (data->moving_average_length_air_pressure < 1) ||
-	   (data->moving_average_length_altitude < 1) ||
 	   (data->moving_average_length_temperature < 1)) {
 		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
 	moving_average_new_length(&lps22hb.moving_average_air_pressure, data->moving_average_length_air_pressure);
-	moving_average_new_length(&lps22hb.moving_average_altitude, data->moving_average_length_altitude);
 	moving_average_new_length(&lps22hb.moving_average_temperature, data->moving_average_length_temperature);
 
 	return HANDLE_MESSAGE_RESPONSE_EMPTY;
@@ -74,14 +73,13 @@ BootloaderHandleMessageResponse set_moving_average_configuration(const SetMoving
 BootloaderHandleMessageResponse get_moving_average_configuration(const GetMovingAverageConfiguration *data, GetMovingAverageConfiguration_Response *response) {
 	response->header.length = sizeof(GetMovingAverageConfiguration_Response);
 	response->moving_average_length_air_pressure = lps22hb.moving_average_air_pressure.length;
-	response->moving_average_length_altitude = lps22hb.moving_average_altitude.length;
 	response->moving_average_length_temperature = lps22hb.moving_average_temperature.length;
 
 	return HANDLE_MESSAGE_RESPONSE_NEW_MESSAGE;
 }
 
 BootloaderHandleMessageResponse set_reference_air_pressure(const SetReferenceAirPressure *data) {
-	if(data->air_pressure < 260000 || data->air_pressure > 1260000) {
+	if((data->air_pressure < 260000 || data->air_pressure > 1260000) && data->air_pressure != 0) {
 		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
@@ -112,23 +110,45 @@ BootloaderHandleMessageResponse set_calibration(const SetCalibration *data) {
 		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
 	}
 
-	// Save to RAM
-	lps22hb.cal_measured_air_pressure = data->measured_air_pressure;
-	lps22hb.cal_actual_air_pressure = data->actual_air_pressure;
-	lps22hb.cal_offset = get_cal_offset(data->measured_air_pressure,
-	                                    data->actual_air_pressure);
-	lps22hb.cal_changed = true;
+	if (lps22hb.measured_air_pressure != data->measured_air_pressure ||
+	    lps22hb.actual_air_pressure != data->actual_air_pressure) {
+		// Save to RAM
+		lps22hb.measured_air_pressure = data->measured_air_pressure;
+		lps22hb.actual_air_pressure = data->actual_air_pressure;
+		lps22hb.calibration_changed = true;
 
-	// Save to flash
-	eeprom_write_calibration();
+		// Save to flash
+		eeprom_write_calibration();
+	}
 
 	return HANDLE_MESSAGE_RESPONSE_EMPTY;
 }
 
 BootloaderHandleMessageResponse get_calibration(const GetCalibration *data, GetCalibration_Response *response) {
 	response->header.length = sizeof(GetCalibration_Response);
-	response->measured_air_pressure = lps22hb.cal_measured_air_pressure;
-	response->actual_air_pressure = lps22hb.cal_actual_air_pressure;
+	response->measured_air_pressure = lps22hb.measured_air_pressure;
+	response->actual_air_pressure = lps22hb.actual_air_pressure;
+
+	return HANDLE_MESSAGE_RESPONSE_NEW_MESSAGE;
+}
+
+BootloaderHandleMessageResponse set_sensor_configuration(const SetSensorConfiguration *data) {
+	if (data->data_rate > BAROMETER_V2_DATA_RATE_75HZ ||
+	    data->air_pressure_low_pass_filter > BAROMETER_V2_LOW_PASS_FILTER_1_20TH) {
+		return HANDLE_MESSAGE_RESPONSE_INVALID_PARAMETER;
+	}
+
+	lps22hb.data_rate = data->data_rate;
+	lps22hb.air_pressure_low_pass_filter = data->air_pressure_low_pass_filter;
+	lps22hb.reconfigure = true;
+
+	return HANDLE_MESSAGE_RESPONSE_EMPTY;
+}
+
+BootloaderHandleMessageResponse get_sensor_configuration(const GetSensorConfiguration *data, GetSensorConfiguration_Response *response) {
+	response->header.length = sizeof(GetSensorConfiguration_Response);
+	response->data_rate = lps22hb.data_rate;
+	response->air_pressure_low_pass_filter = lps22hb.air_pressure_low_pass_filter;
 
 	return HANDLE_MESSAGE_RESPONSE_NEW_MESSAGE;
 }
