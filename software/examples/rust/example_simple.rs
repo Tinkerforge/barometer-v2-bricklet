@@ -1,25 +1,25 @@
 use std::{error::Error, io};
 
-use tinkerforge::{barometer_v2_bricklet::*, ipconnection::IpConnection};
+use tinkerforge::{barometer_v2_bricklet::*, ip_connection::IpConnection};
 
-const HOST: &str = "127.0.0.1";
+const HOST: &str = "localhost";
 const PORT: u16 = 4223;
-const UID: &str = "XYZ"; // Change XYZ to the UID of your Barometer Bricklet 2.0
+const UID: &str = "XYZ"; // Change XYZ to the UID of your Barometer Bricklet 2.0.
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let ipcon = IpConnection::new(); // Create IP connection
-    let barometer_v2_bricklet = BarometerV2Bricklet::new(UID, &ipcon); // Create device object
+    let ipcon = IpConnection::new(); // Create IP connection.
+    let b = BarometerV2Bricklet::new(UID, &ipcon); // Create device object.
 
-    ipcon.connect(HOST, PORT).recv()??; // Connect to brickd
-                                        // Don't use device before ipcon is connected
+    ipcon.connect((HOST, PORT)).recv()??; // Connect to brickd.
+                                          // Don't use device before ipcon is connected.
 
-    // Get current air pressure
-    let air_pressure = barometer_v2_bricklet.get_air_pressure().recv()?;
-    println!("Air Pressure: {}{}", air_pressure as f32 / 1000.0, " mbar");
+    // Get current air pressure.
+    let air_pressure = b.get_air_pressure().recv()?;
+    println!("Air Pressure: {} mbar", air_pressure as f32 / 1000.0);
 
-    // Get current altitude
-    let altitude = barometer_v2_bricklet.get_altitude().recv()?;
-    println!("Altitude: {}{}", altitude as f32 / 1000.0, " m");
+    // Get current altitude.
+    let altitude = b.get_altitude().recv()?;
+    println!("Altitude: {} m", altitude as f32 / 1000.0);
 
     println!("Press enter to exit.");
     let mut _input = String::new();
