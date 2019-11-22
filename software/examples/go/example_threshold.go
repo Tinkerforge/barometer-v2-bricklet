@@ -19,11 +19,11 @@ func main() {
 	// Don't use device before ipcon is connected.
 
 	b.RegisterAirPressureCallback(func(airPressure int32) {
-		fmt.Printf("Air Pressure: %f mbar\n", float64(airPressure)/1000.0)
+		fmt.Printf("Air Pressure: %f hPa\n", float64(airPressure)/1000.0)
 		fmt.Println("Enjoy the potentially good weather!")
 	})
 
-	// Configure threshold for air pressure "greater than 1025 mbar"
+	// Configure threshold for air pressure "greater than 1025 hPa"
 	// with a debounce period of 1s (1000ms).
 	b.SetAirPressureCallbackConfiguration(1000, false, '>', 1025*1000, 0)
 

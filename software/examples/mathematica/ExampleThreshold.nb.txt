@@ -13,13 +13,13 @@ ipcon@Connect[host,port]
 (*Callback function for air pressure callback*)
 AirPressureCB[sender_,airPressure_]:=
  Module[{},
-  Print["Air Pressure: "<>ToString[N[Quantity[airPressure,"mbar/1000"]]]];
+  Print["Air Pressure: "<>ToString[N[Quantity[airPressure,"hPa/1000"]]]];
   Print["Enjoy the potentially good weather!"]
  ]
 
 AddEventHandler[b@AirPressureCallback,AirPressureCB]
 
-(*Configure threshold for air pressure "greater than 1025 mbar"*)
+(*Configure threshold for air pressure "greater than 1025 hPa"*)
 (*with a debounce period of 1s (1000ms)*)
 option=Tinkerforge`BrickletBarometerV2`THRESHOLDUOPTIONUGREATER
 b@SetAirPressureCallbackConfiguration[1000,False,option,1025*1000,0]

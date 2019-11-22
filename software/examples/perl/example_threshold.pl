@@ -13,7 +13,7 @@ sub cb_air_pressure
 {
     my ($air_pressure) = @_;
 
-    print "Air Pressure: " . $air_pressure/1000.0 . " mbar\n";
+    print "Air Pressure: " . $air_pressure/1000.0 . " hPa\n";
     print "Enjoy the potentially good weather!\n";
 }
 
@@ -26,7 +26,7 @@ $ipcon->connect(&HOST, &PORT); # Connect to brickd
 # Register air pressure callback to subroutine cb_air_pressure
 $b->register_callback($b->CALLBACK_AIR_PRESSURE, 'cb_air_pressure');
 
-# Configure threshold for air pressure "greater than 1025 mbar"
+# Configure threshold for air pressure "greater than 1025 hPa"
 # with a debounce period of 1s (1000ms)
 $b->set_air_pressure_callback_configuration(1000, 0, '>', 1025*1000, 0);
 

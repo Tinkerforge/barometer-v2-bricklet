@@ -13,7 +13,7 @@ const UID = 'XYZ'; // Change XYZ to the UID of your Barometer Bricklet 2.0
 // Callback function for air pressure callback
 function cb_airPressure($air_pressure)
 {
-    echo "Air Pressure: " . $air_pressure/1000.0 . " mbar\n";
+    echo "Air Pressure: " . $air_pressure/1000.0 . " hPa\n";
     echo "Enjoy the potentially good weather!\n";
 }
 
@@ -26,7 +26,7 @@ $ipcon->connect(HOST, PORT); // Connect to brickd
 // Register air pressure callback to function cb_airPressure
 $b->registerCallback(BrickletBarometerV2::CALLBACK_AIR_PRESSURE, 'cb_airPressure');
 
-// Configure threshold for air pressure "greater than 1025 mbar"
+// Configure threshold for air pressure "greater than 1025 hPa"
 // with a debounce period of 1s (1000ms)
 $b->setAirPressureCallbackConfiguration(1000, FALSE, '>', 1025*1000, 0);
 

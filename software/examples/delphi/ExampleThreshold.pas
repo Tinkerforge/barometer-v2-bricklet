@@ -28,7 +28,7 @@ var
 procedure TExample.AirPressureCB(sender: TBrickletBarometerV2;
                                  const airPressure: longint);
 begin
-  WriteLn(Format('Air Pressure: %f mbar', [airPressure/1000.0]));
+  WriteLn(Format('Air Pressure: %f hPa', [airPressure/1000.0]));
   WriteLn('Enjoy the potentially good weather!');
 end;
 
@@ -47,7 +47,7 @@ begin
   { Register air pressure callback to procedure AirPressureCB }
   b.OnAirPressure := {$ifdef FPC}@{$endif}AirPressureCB;
 
-  { Configure threshold for air pressure "greater than 1025 mbar"
+  { Configure threshold for air pressure "greater than 1025 hPa"
     with a debounce period of 1s (1000ms) }
   b.SetAirPressureCallbackConfiguration(1000, false, '>', 1025*1000, 0);
 

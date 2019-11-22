@@ -19,12 +19,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     // is dropped, so there is no need for manual cleanup.
     thread::spawn(move || {
         for air_pressure in air_pressure_receiver {
-            println!("Air Pressure: {} mbar", air_pressure as f32 / 1000.0);
+            println!("Air Pressure: {} hPa", air_pressure as f32 / 1000.0);
             println!("Enjoy the potentially good weather!");
         }
     });
 
-    // Configure threshold for air pressure "greater than 1025 mbar"
+    // Configure threshold for air pressure "greater than 1025 hPa"
     // with a debounce period of 1s (1000ms).
     b.set_air_pressure_callback_configuration(1000, false, '>', 1025 * 1000, 0);
 

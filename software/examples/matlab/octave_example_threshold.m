@@ -14,7 +14,7 @@ function octave_example_threshold()
     % Register air pressure callback to function cb_air_pressure
     b.addAirPressureCallback(@cb_air_pressure);
 
-    % Configure threshold for air pressure "greater than 1025 mbar"
+    % Configure threshold for air pressure "greater than 1025 hPa"
     % with a debounce period of 1s (1000ms)
     b.setAirPressureCallbackConfiguration(1000, false, ">", 1025*1000, 0);
 
@@ -24,6 +24,6 @@ end
 
 % Callback function for air pressure callback
 function cb_air_pressure(e)
-    fprintf("Air Pressure: %g mbar\n", e.airPressure/1000.0);
+    fprintf("Air Pressure: %g hPa\n", e.airPressure/1000.0);
     fprintf("Enjoy the potentially good weather!\n");
 end

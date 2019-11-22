@@ -18,11 +18,11 @@ ipcon.connect HOST, PORT # Connect to brickd
 
 # Register air pressure callback
 b.register_callback(BrickletBarometerV2::CALLBACK_AIR_PRESSURE) do |air_pressure|
-  puts "Air Pressure: #{air_pressure/1000.0} mbar"
+  puts "Air Pressure: #{air_pressure/1000.0} hPa"
   puts 'Enjoy the potentially good weather!'
 end
 
-# Configure threshold for air pressure "greater than 1025 mbar"
+# Configure threshold for air pressure "greater than 1025 hPa"
 # with a debounce period of 1s (1000ms)
 b.set_air_pressure_callback_configuration 1000, false, '>', 1025*1000, 0
 

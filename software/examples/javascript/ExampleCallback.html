@@ -50,7 +50,7 @@
                 b.on(Tinkerforge.BrickletBarometerV2.CALLBACK_AIR_PRESSURE,
                     // Callback function for air pressure callback
                     function (airPressure) {
-                        textArea.value += 'Air Pressure: ' + airPressure/1000.0 + ' mbar\n';
+                        textArea.value += 'Air Pressure: ' + airPressure/1000.0 + ' hPa\n';
                         textArea.scrollTop = textArea.scrollHeight;
                     }
                 );

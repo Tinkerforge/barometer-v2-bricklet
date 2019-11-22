@@ -11,7 +11,7 @@
 void cb_air_pressure(int32_t air_pressure, void *user_data) {
 	(void)user_data; // avoid unused parameter warning
 
-	printf("Air Pressure: %f mbar\n", air_pressure/1000.0);
+	printf("Air Pressure: %f hPa\n", air_pressure/1000.0);
 	printf("Enjoy the potentially good weather!\n");
 }
 
@@ -37,7 +37,7 @@ int main(void) {
 	                               (void (*)(void))cb_air_pressure,
 	                               NULL);
 
-	// Configure threshold for air pressure "greater than 1025 mbar"
+	// Configure threshold for air pressure "greater than 1025 hPa"
 	// with a debounce period of 1s (1000ms)
 	barometer_v2_set_air_pressure_callback_configuration(&b, 1000, false, '>', 1025*1000, 0);
 

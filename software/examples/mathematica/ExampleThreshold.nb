@@ -19,13 +19,13 @@ Notebook[{
    RowBox[{"
 "}],
    RowBox[{"(*", "Callback function for air pressure callback", "*)"}],
-   RowBox[{RowBox[{"AirPressureCB", "[", RowBox[{"sender_", ",", "airPressure_"}], "]"}], ":=", "\[IndentingNewLine]", RowBox[{"Module", "[", RowBox[{RowBox[{"{", "}"}], ",", RowBox[{"\[IndentingNewLine]", RowBox[{"Print", "[", RowBox[{"\"\<Air Pressure: \>\"", "<>", RowBox[{"ToString", "[", RowBox[{"N", "[", RowBox[{"Quantity", "[", RowBox[{"airPressure", ",", "\"\<mbar/1000\>\""}], "]"}], "]"}], "]"}]}], "]"}], ";", "\[IndentingNewLine]", RowBox[{"Print", "[", "\"\<Enjoy the potentially good weather!\>\"", "]"}], "\[IndentingNewLine]"}]}], "]"}]}],
+   RowBox[{RowBox[{"AirPressureCB", "[", RowBox[{"sender_", ",", "airPressure_"}], "]"}], ":=", "\[IndentingNewLine]", RowBox[{"Module", "[", RowBox[{RowBox[{"{", "}"}], ",", RowBox[{"\[IndentingNewLine]", RowBox[{"Print", "[", RowBox[{"\"\<Air Pressure: \>\"", "<>", RowBox[{"ToString", "[", RowBox[{"N", "[", RowBox[{"Quantity", "[", RowBox[{"airPressure", ",", "\"\<hPa/1000\>\""}], "]"}], "]"}], "]"}]}], "]"}], ";", "\[IndentingNewLine]", RowBox[{"Print", "[", "\"\<Enjoy the potentially good weather!\>\"", "]"}], "\[IndentingNewLine]"}]}], "]"}]}],
    RowBox[{"
 "}],
    RowBox[{"AddEventHandler", "[", RowBox[{RowBox[{"b", "@", "AirPressureCallback"}], ",", "AirPressureCB"}], "]"}],
    RowBox[{"
 "}],
-   RowBox[{"(*", "Configure threshold for air pressure ", "\"\<greater than 1025 mbar\>\"", "", "*)"}],
+   RowBox[{"(*", "Configure threshold for air pressure ", "\"\<greater than 1025 hPa\>\"", "", "*)"}],
    RowBox[{"(*", "with a debounce period of 1s (1000ms)", "*)"}],
    RowBox[{"option", "=", "Tinkerforge`BrickletBarometerV2`THRESHOLDUOPTIONUGREATER"}],
    RowBox[{"b", "@", RowBox[{"SetAirPressureCallbackConfiguration", "[", RowBox[{"1000", ",", "False", ",", "option", ",", RowBox[{"1025", "*", "1000"}], ",", "0"}], "]"}]}],

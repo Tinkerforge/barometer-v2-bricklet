@@ -16,7 +16,7 @@ ipcon.connect(HOST, PORT,
 
 ipcon.on(Tinkerforge.IPConnection.CALLBACK_CONNECTED,
     function (connectReason) {
-        // Configure threshold for air pressure "greater than 1025 mbar"
+        // Configure threshold for air pressure "greater than 1025 hPa"
         // with a debounce period of 1s (1000ms)
         b.setAirPressureCallbackConfiguration(1000, false, '>', 1025*1000, 0);
     }
@@ -26,7 +26,7 @@ ipcon.on(Tinkerforge.IPConnection.CALLBACK_CONNECTED,
 b.on(Tinkerforge.BrickletBarometerV2.CALLBACK_AIR_PRESSURE,
     // Callback function for air pressure callback
     function (airPressure) {
-        console.log('Air Pressure: ' + airPressure/1000.0 + ' mbar');
+        console.log('Air Pressure: ' + airPressure/1000.0 + ' hPa');
         console.log('Enjoy the potentially good weather!');
     }
 );
