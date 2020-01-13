@@ -4,7 +4,7 @@ setup:
 	# Handle incoming air pressure callbacks
 	subscribe to tinkerforge/callback/barometer_v2_bricklet/XYZ/air_pressure
 	publish '{"register": true}' to tinkerforge/register/barometer_v2_bricklet/XYZ/air_pressure # Register air_pressure callback
-	
+
 	# Configure threshold for air pressure "greater than 1025 hPa"
 	# with a debounce period of 1s (1000ms)
 	publish '{"period": 1000, "value_has_to_change": false, "option": "greater", "min": 1025000, "max": 0}' to tinkerforge/request/barometer_v2_bricklet/XYZ/set_air_pressure_callback_configuration
