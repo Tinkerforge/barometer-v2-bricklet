@@ -11,7 +11,6 @@ void example_setup(TF_HalContext *hal) {
 	// Create device object
 	check(tf_barometer_v2_create(&b, UID, hal), "create device object");
 
-
 	// Get current air pressure
 	int32_t air_pressure;
 	check(tf_barometer_v2_get_air_pressure(&b, &air_pressure), "get air pressure");
@@ -23,7 +22,6 @@ void example_setup(TF_HalContext *hal) {
 	check(tf_barometer_v2_get_altitude(&b, &altitude), "get altitude");
 
 	tf_hal_printf("Altitude: %d 1/%d m\n", altitude, 1000.0);
-
 }
 
 void example_loop(TF_HalContext *hal) {

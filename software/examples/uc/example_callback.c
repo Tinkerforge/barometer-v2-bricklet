@@ -18,15 +18,13 @@ void example_setup(TF_HalContext *hal) {
 	// Create device object
 	check(tf_barometer_v2_create(&b, UID, hal), "create device object");
 
-
 	// Register air pressure callback to function air_pressure_handler
 	tf_barometer_v2_register_air_pressure_callback(&b,
-	                                              air_pressure_handler,
-	                                              NULL);
+	                                               air_pressure_handler,
+	                                               NULL);
 
 	// Set period for air pressure callback to 1s (1000ms) without a threshold
 	tf_barometer_v2_set_air_pressure_callback_configuration(&b, 1000, false, 'x', 0, 0);
-
 }
 
 void example_loop(TF_HalContext *hal) {
