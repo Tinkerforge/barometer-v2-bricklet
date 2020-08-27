@@ -5,14 +5,19 @@
 
 void check(int rc, const char* msg);
 
+void example_setup(TF_HalContext *hal);
+void example_loop(TF_HalContext *hal);
+
+
 // Callback function for air pressure callback
-void air_pressure_handler(TF_BarometerV2 *device, int32_t air_pressure, void *user_data) {
+static void air_pressure_handler(TF_BarometerV2 *device, int32_t air_pressure,
+                                 void *user_data) {
 	(void)device; (void)user_data; // avoid unused parameter warning
 
 	tf_hal_printf("Air Pressure: %d 1/%d hPa\n", air_pressure, 1000.0);
 }
 
-TF_BarometerV2 b;
+static TF_BarometerV2 b;
 
 void example_setup(TF_HalContext *hal) {
 	// Create device object
