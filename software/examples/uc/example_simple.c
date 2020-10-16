@@ -23,13 +23,13 @@ void example_setup(TF_HalContext *hal) {
 	int32_t air_pressure;
 	check(tf_barometer_v2_get_air_pressure(&b, &air_pressure), "get air pressure");
 
-	tf_hal_printf("Air Pressure: %d 1/%d hPa\n", air_pressure, 1000.0);
+	tf_hal_printf("Air Pressure: %d 1/%d hPa\n", air_pressure, 1000);
 
 	// Get current altitude
 	int32_t altitude;
 	check(tf_barometer_v2_get_altitude(&b, &altitude), "get altitude");
 
-	tf_hal_printf("Altitude: %d 1/%d m\n", altitude, 1000.0);
+	tf_hal_printf("Altitude: %d 1/%d m\n", altitude, 1000);
 }
 
 void example_loop(TF_HalContext *hal) {
