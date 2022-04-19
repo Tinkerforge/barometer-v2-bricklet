@@ -9,8 +9,8 @@
 
 void check(int rc, const char* msg);
 
-void example_setup(TF_HalContext *hal);
-void example_loop(TF_HalContext *hal);
+void example_setup(TF_HAL *hal);
+void example_loop(TF_HAL *hal);
 
 
 // Callback function for air pressure callback
@@ -23,7 +23,7 @@ static void air_pressure_handler(TF_BarometerV2 *device, int32_t air_pressure,
 
 static TF_BarometerV2 b;
 
-void example_setup(TF_HalContext *hal) {
+void example_setup(TF_HAL *hal) {
 	// Create device object
 	check(tf_barometer_v2_create(&b, UID, hal), "create device object");
 
@@ -36,7 +36,7 @@ void example_setup(TF_HalContext *hal) {
 	tf_barometer_v2_set_air_pressure_callback_configuration(&b, 1000, false, 'x', 0, 0);
 }
 
-void example_loop(TF_HalContext *hal) {
+void example_loop(TF_HAL *hal) {
 	// Poll for callbacks
 	tf_hal_callback_tick(hal, 0);
 }
